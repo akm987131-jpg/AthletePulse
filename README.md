@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AthletePulse — Sports Injury-Awareness & Athlete-Coach Platform
 
 > Production-minded, security-hardened backend and responsive web platform connecting athletes with their coaching staff through structured training logs, natural language discomfort reporting, clinical safety triage, and closed-loop feedback.
@@ -211,3 +212,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    npm run build
    npm run start
    ```
+=======
+# AthletePulse
+platform for coach and athletes for day to day injury tracking(web based)
+>>>>>>> aa11aa2f65ad482fda77291686c07f069c7e6dea
