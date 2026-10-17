@@ -2,9 +2,85 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { connectToDatabase } from "@/lib/db";
 import { authenticateRequest } from "@/lib/auth";
-import { DailyLog } from "@/models/DailyLog";
+import { DailyLog, BodySide, SymptomType, OnsetType } from "@/models/DailyLog";
 import { extractSymptomFields } from "@/services/ai_service";
 import { successResponse, errorResponse, handleApiError } from "@/lib/api-response";
+
+function normalizeBodySide(value?: string): BodySide {
+  if (!value) return "unspecified";
+  const normalized = value.toLowerCase().trim();
+  if (
+    normalized === "left" ||
+    normalized === "right" ||
+    normalized === "bilateral" ||
+    normalized === "center" ||
+    normalized === "unspecified"
+  ) {
+    return normalized;
+  }
+  if (normalized.includes("both")) return "bilateral";
+  if (normalized.includes("left")) return "left";
+  if (normalized.includes("right")) return "right";
+  if (normalized.includes("center") || normalized.includes("middle")) return "center";
+  return "unspecified";
+}
+
+function normalizeSymptomType(value?: string): SymptomType {
+  if (!value) return "soreness";
+  const normalized = value.toLowerCase().trim().replace(/[\s-]+/g, "_");
+  const validSymptoms: SymptomType[] = [
+    "sharp_pain",
+    "dull_ache",
+    "tightness",
+    "stiffness",
+    "swelling",
+    "throbbing",
+    "soreness",
+    "weakness",
+    "numbness_tingling",
+    "other",
+    "none",
+  ];
+  if (validSymptoms.includes(normalized as SymptomType)) {
+    return normalized as SymptomType;
+  }
+  if (normalized.includes("sharp") || normalized.includes("stab")) return "sharp_pain";
+  if (normalized.includes("dull") || normalized.includes("ache")) return "dull_ache";
+  if (normalized.includes("tight") || normalized.includes("cramp")) return "tightness";
+  if (normalized.includes("stiff")) return "stiffness";
+  if (normalized.includes("swell")) return "swelling";
+  if (normalized.includes("throbb")) return "throbbing";
+  if (normalized.includes("weak")) return "weakness";
+  if (normalized.includes("numb") || normalized.includes("tingl")) return "numbness_tingling";
+  if (normalized.includes("sore")) return "soreness";
+  return "other";
+}
+
+function normalizeOnsetType(value?: string): OnsetType {
+  if (!value) return "acute";
+  const normalized = value.toLowerCase().trim().replace(/[\s-]+/g, "_");
+  const validOnsets: OnsetType[] = [
+    "acute",
+    "gradual",
+    "insidious",
+    "post_workout",
+    "unknown",
+  ];
+  if (validOnsets.includes(normalized as OnsetType)) {
+    return normalized as OnsetType;
+  }
+  if (
+    normalized.includes("post") ||
+    normalized.includes("exercise") ||
+    normalized.includes("workout")
+  ) {
+    return "post_workout";
+  }
+  if (normalized.includes("gradual") || normalized.includes("slow")) return "gradual";
+  if (normalized.includes("insidious")) return "insidious";
+  if (normalized.includes("acute") || normalized.includes("sudden")) return "acute";
+  return "unknown";
+}
 
 const createLogSchema = z.object({
   workoutDescription: z
@@ -75,20 +151,20 @@ export async function POST(request: NextRequest) {
         ? extracted.affectedBodyPart
         : (validated.affectedBodyPart || "unspecified");
 
-    const finalBodySide =
+    const finalBodySide: BodySide =
       extracted.bodySide && extracted.bodySide !== "unspecified"
         ? extracted.bodySide
-        : (validated.bodySide || "unspecified");
+        : normalizeBodySide(validated.bodySide);
 
-    const finalSymptom =
+    const finalSymptom: SymptomType =
       extracted.symptomType && extracted.symptomType !== "none"
         ? extracted.symptomType
-        : (validated.symptomType || "soreness");
+        : normalizeSymptomType(validated.symptomType);
 
-    const finalOnset =
+    const finalOnset: OnsetType =
       extracted.onset && extracted.onset !== "unknown"
         ? extracted.onset
-        : (validated.onset || "acute");
+        : normalizeOnsetType(validated.onset);
 
     // Save DailyLog in MongoDB (preserve original text completely unchanged)
     const newLog = await DailyLog.create({
